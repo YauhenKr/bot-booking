@@ -1,0 +1,67 @@
+hi: "Let's start?"
+hi_b: "Registration"
+start:
+  text: "Welcome to CreateCulture Space. You need to read the rules for registration."
+  url: "https://t.me/createculturegroup"
+  buttons:
+    rules: "Rules"
+    next: "Access"
+    cancel: "Cancel"
+
+canceling: "Good bye. We are waiting for you next time."
+
+reg:
+  name: "Please send your name"
+  email: "Please send your email"
+  birthdate: "Please send your birthdate in format DD.MM.YYYY"
+  ask: "Is this information is valid?"
+  only_let: "Your name should consist of letters only"
+  huge_name: "Length of name could be from 2 to 30 letters"
+  invalid_e: "Something wrong. Check your email"
+  invalid_d: "Check your birthdate. Format should be DD.MM.YYYY"
+  check_name: "Your name"
+  check_email: "Your email"
+  check_birth: "Your birthdate"
+  ask_by: "Yes"
+  ask_bn: "Cancel the registration"
+  success: "Віншуем! Рэгістрацыя прайшла паспяхова!\n\nВашы даступныя квіткі ў гэтым месяцы для браніравання 
+  CreateCulture Space - 22\n\nАдзін квіток гэта:\nМагчымасць працаваць у каворкінге ўвесь дзень\nАдна гадзіна 
+  перагаворнага пакою Акно або Бібліятэка"
+  cancel: "Вы адмянілі рэгістрацыю"
+
+menu:
+  msg: "This menu will help you find all for bookings"
+  btns:
+    cowork: "CO-WORKING"
+    comm: "COMMUNITY AND EVENTS"
+    rooms: "ROOMS"
+    mycab: "MY PROFILE"
+
+cw:
+  msg: "address: Karmelitu 5\nWorking hours: 10-00 - 18-00\n\n"
+  btn: "Book"
+
+cw_reg:
+  msg: "Даступныя для броні даты"
+  msg_btn_next: "Наступны месяц"
+  btn_reg: "Бронь"
+  btn_unreg: "Скасаваць браніраваньне"
+  unreg: "Вы адмянілі браніраваньне"
+  msg_book: "Для броні вы абралі дату:"
+  info: "Бронь месца прайшла выдатна!"
+  info1: "Код квітка:"
+  info2: "адрас: Karmelitu 5\nПрацуем: 10-00 - 18-00\n"
+  info3: "Дата:"
+  onemore: "Дадаць яшчэ адзін дзень"
+  no_tickets: "Каб аднавіць магчымасьць броні, папоўніце квіткі"
+
+
+commeven:
+  msg: "Абярыце катэгорыю"
+  btn1: "Кам'юніці"
+  btn2: "Падзеі"
+  link1: "https://t.me/createculturegroup"
+  link2: "https://t.me/createculturegroup"
+
+  community1: "Чат"
+  community2: "Падтрымаць на Patreon"
