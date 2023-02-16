@@ -9,19 +9,15 @@ from aiogram import executor, types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from dateutil.relativedelta import relativedelta
-from workalendar.europe import Lithuania
 
-from create_bot import dp, bot, db, admins_id
+from create_bot import dp, bot, db, admins_id, cal, obj
 from handlers import admin, mailing
-from qr import crete_qrcode
 from services import check_date, check_email, filter_working_days, \
     numbs, get_randint, get_today, meeting_numbs, meeting_time, create_time, \
     create_name_of_meet_room, meeting_rooms, reduce_tickets, booking_codes, meeting_codes, \
     check_the_month_upgrade_tickets, recreate_month, recreate_day, custom_holidays
-from states import RegistrationStateGroup, BookingStateGroup, MeetingStateGroup, DeleteAppointmentState, BotMailing
+from states import RegistrationStateGroup, BookingStateGroup, MeetingStateGroup, DeleteAppointmentState
 
-cal = Lithuania()
-obj = calendar.Calendar()
 
 logging.basicConfig(level=logging.INFO)
 
@@ -217,8 +213,8 @@ async def booking(call: types.CallbackQuery, state: FSMContext):
     db.add_booking(user_id, 1, date, code)
     if user_id not in admins_id:
         reduce_tickets(date, user_id)
-    # photo = open(f'{crete_qrcode(code)}', 'rb')
     markup = one_more_booking_markup()
+    markup2 = main_menu()
     await state.finish()
     await call.message.answer(
         f"{text_from_file['cw_reg']['info']} \n\n"
@@ -226,6 +222,7 @@ async def booking(call: types.CallbackQuery, state: FSMContext):
         f"{text_from_file['cw_reg']['info2']}\n"
         f"{text_from_file['cw_reg']['info3']}: {date}\n",
         reply_markup=markup)
+    await call.message.answer(text_from_file['room']['mm'], reply_markup=markup2)
 
 
 @dp.callback_query_handler(text='unreg', state=[BookingStateGroup.date_1, BookingStateGroup.date_2])
@@ -277,6 +274,12 @@ async def community_events(message: types.Message):
 async def community(call: types.CallbackQuery):
     markup = community_markup()
     await call.message.answer(text_from_file['commeven']['btn1'], reply_markup=markup)
+
+
+@dp.callback_query_handler(text='events')
+async def events(call: types.CallbackQuery):
+    markup = events_markup()
+    await call.message.answer(text_from_file['commeven']['btn2'], reply_markup=markup)
 
 
 # my profile flow
@@ -396,8 +399,19 @@ async def rooms(message: types.Message):
     await message.answer(text_from_file['room']['info'], reply_markup=markup)
 
 
-@dp.callback_query_handler(text=['reg_meet', 'onemore_meeting'], state=None)
-async def this_month_meetings(call: types.CallbackQuery):
+@dp.callback_query_handler(text=['choice_room', 'onemore_meeting'], state=None)
+async def choice_the_meeting_room(call: types.CallbackQuery):
+    meeting_rooms.clear()
+    meeting_room_numbers = db.get_meeting_rooms()
+    markup_description = create_meeting_room_buttons(meeting_room_numbers)
+    await call.message.answer(markup_description[1], reply_markup=markup_description[0])
+    await MeetingStateGroup.room.set()
+
+
+@dp.callback_query_handler(text=meeting_rooms, state=MeetingStateGroup.room)
+async def this_month_meetings(call: types.CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        data['room'] = call.data
     user_id = call.message.chat.id
     tickets = db.get_users_tickets_this_month(user_id)[0][0]
     if tickets != 0:
@@ -409,7 +423,9 @@ async def this_month_meetings(call: types.CallbackQuery):
             day = recreate_day(day)
             current_month = recreate_month(current_month)
             ymd = f"{current_year}-{current_month}-{day}"
-            if db.get_meetings_count(ymd)[0][0] < 16 and ymd not in custom_holidays:
+            user_meetings_amount = db.get_particular_meetings_count(ymd, user_id)[0][0]
+            if db.get_meetings_count(ymd, call.data)[0][0] < 8 and ymd not in custom_holidays\
+                    and user_meetings_amount < 2:
                 meeting_numbs.append(ymd)
                 buttons.append(types.InlineKeyboardButton(str(day), callback_data=ymd))
         btn = types.InlineKeyboardButton(text_from_file['cw_reg']['msg_btn_next'], callback_data='next_month_meetings')
@@ -423,7 +439,9 @@ async def this_month_meetings(call: types.CallbackQuery):
 
 
 @dp.callback_query_handler(text='next_month_meetings', state=MeetingStateGroup.date_1)
-async def next_month_meetings(call: types.CallbackQuery):
+async def next_month_meetings(call: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    number_of_room = data.get('room')
     user_id = call.message.chat.id
     tickets = db.get_users_tickets_this_month(user_id)[0][0]
     if tickets != 0:
@@ -437,7 +455,9 @@ async def next_month_meetings(call: types.CallbackQuery):
             day = recreate_day(day)
             month = recreate_month(month)
             ymd = f"{year}-{month}-{day}"
-            if db.get_meetings_count(ymd)[0][0] < 16 and ymd not in custom_holidays:
+            user_meetings_amount = db.get_particular_meetings_count(ymd, user_id)[0][0]
+            if db.get_meetings_count(ymd, number_of_room)[0][0] < 8 and ymd not in custom_holidays\
+                    and user_meetings_amount < 2:
                 meeting_numbs.append(ymd)
                 buttons.append(types.InlineKeyboardButton(str(day), callback_data=ymd))
         btn_month = types.InlineKeyboardButton(text=str(date.strftime("%B")), callback_data='-')
@@ -457,7 +477,7 @@ async def time_for_meetings(call: types.CallbackQuery, state: FSMContext):
     buttons = []
     for gap in range(10, 18):
         time = create_time(gap)
-        if db.get_meetings_room_count(time, call.data)[0][0] < 2:
+        if db.get_meetings_room_count(time, call.data)[0][0] < 1:
             meeting_time.append(time)
             buttons.append(types.InlineKeyboardButton(time, callback_data=str(time)))
     btn_cancel = types.InlineKeyboardButton(text=text_from_file['room']['unreg'], callback_data='unreg_meetings')
@@ -467,51 +487,24 @@ async def time_for_meetings(call: types.CallbackQuery, state: FSMContext):
 
 
 @dp.callback_query_handler(text=meeting_time, state=MeetingStateGroup.time)
-async def room_for_meeting(call: types.CallbackQuery, state: FSMContext):
-    buttons = []
-    text = ''
-    spare_rooms = []
-    meeting_rooms.clear()
-
-    data = await state.get_data()
-    date = data.get('date_1')
+async def book_particular_meeting_room(call: types.CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         data['time'] = call.data
-    time = call.data
-    booked_room = db.get_booked_room_this_meeting(time, date)
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    if not booked_room:
-        spare_rooms = (room for room in db.get_meeting_rooms())
-    for room in booked_room:
-        spare_rooms.append(db.get_spare_room_this_meeting(room[0])[0])
-    for free_room in spare_rooms:
-        button_text = create_name_of_meet_room(text_from_file['room']['meet_room'], free_room[0])
-        meeting_rooms.append(free_room[0])
-        buttons.append(types.InlineKeyboardButton(button_text, callback_data=str(free_room[0])))
-        text += text_from_file['room'][free_room[0]] + ' ' + '\n\n'
-    markup.add(*buttons)
-    await MeetingStateGroup.free_room.set()
-    await call.message.answer(f"Дата:{date} Час:{time}\n\n{text}", reply_markup=markup)
-
-
-@dp.callback_query_handler(text=meeting_rooms, state=MeetingStateGroup.free_room)
-async def book_particular_meeting_room(call: types.CallbackQuery, state: FSMContext):
-    photo = open(f'{call.data}.jpg', 'rb')
-    async with state.proxy() as data:
-        data['room'] = call.data
     data = await state.get_data()
+    room = data.get('room')
+    photo = open(f'{room}.jpg', 'rb')
     markup = meeting_yes_no_markup()
-    await MeetingStateGroup.room.set()
+    await MeetingStateGroup.final_room.set()
     await call.message.answer_photo(
         photo=photo,
         caption=f"{text_from_file['room']['sure']}: \n\n"
-                f"{text_from_file['room'][int(data.get('room'))]} \n\n"
+                f"{text_from_file['room'][int(room)]} \n\n"
                 f"{text_from_file['room']['date']}: {data.get('date_1')} \n"
                 f"{text_from_file['room']['time']}: {data.get('time')}",
         reply_markup=markup)
 
 
-@dp.callback_query_handler(text='reg_meetings', state=MeetingStateGroup.room)
+@dp.callback_query_handler(text='reg_meetings', state=MeetingStateGroup.final_room)
 async def book_meeting(call: types.CallbackQuery, state: FSMContext):
     user_id = call.message.chat.id
     data = await state.get_data()
@@ -523,6 +516,7 @@ async def book_meeting(call: types.CallbackQuery, state: FSMContext):
     if user_id not in admins_id:
         reduce_tickets(date, user_id)
     markup = one_more_meeting_markup()
+    markup2 = main_menu()
     meeting_numbs.clear()
     meeting_time.clear()
     meeting_rooms.clear()
@@ -534,18 +528,26 @@ async def book_meeting(call: types.CallbackQuery, state: FSMContext):
         f"{text_from_file['room']['date_meet']}: {date}\n"
         f"{text_from_file['room']['time_meet']}: {time}\n",
         reply_markup=markup)
+    await call.message.answer(text_from_file['room']['mm'], reply_markup=markup2)
+
 
 
 @dp.callback_query_handler(
     text='unreg_meetings',
     state=[
         MeetingStateGroup.date_1, MeetingStateGroup.date_2,
-        MeetingStateGroup.time, MeetingStateGroup.free_room,
+        MeetingStateGroup.time,
         MeetingStateGroup.room
     ])
 async def cancel_booking(call: types.CallbackQuery, state: FSMContext):
     await state.finish()
     await call.message.answer(text_from_file['cw_reg']['unreg'])
+
+
+@dp.message_handler(state="*", commands=['stopstates'])
+async def unstate(message: types.Message, state: FSMContext):
+    await state.finish()
+    await message.answer(text_from_file['restart'])
 
 
 # buttons
@@ -608,7 +610,7 @@ def community_events_markup():
             )],
             [InlineKeyboardButton(
                 text_from_file['commeven']['btn2'],
-                url=text_from_file['commeven']['link1']
+                callback_data='events'
             )]
         ],
         resize_keyboard=True
@@ -681,7 +683,7 @@ def profile_markup():
             )],
             [InlineKeyboardButton(
                 text_from_file['profile']['btn3'],
-                url=text_from_file['commeven']['link2']
+                url=text_from_file['profile']['manager']
             )]
         ],
         resize_keyboard=True
@@ -713,7 +715,7 @@ def one_more_meeting_markup():
 def book_meeting_markup():
     markup = InlineKeyboardMarkup(
         row_width=1,
-        inline_keyboard=[[InlineKeyboardButton(text_from_file['room']['btn'], callback_data='reg_meet')]],
+        inline_keyboard=[[InlineKeyboardButton(text_from_file['room']['btn'], callback_data='choice_room')]],
         resize_keyboard=True
     )
     return markup
@@ -724,11 +726,53 @@ def delete_booking_meeting_markup():
         row_width=1,
         inline_keyboard=[
             [InlineKeyboardButton(text_from_file['profile']['delete'], callback_data='delete')],
-            [InlineKeyboardButton(text_from_file['profile']['delete'], callback_data='exit')]
+            [InlineKeyboardButton(text_from_file['profile']['exit'], callback_data='exit')]
         ],
         resize_keyboard=True
     )
     return markup
+
+
+def events_markup():
+    markup = InlineKeyboardMarkup(
+        row_width=1,
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text_from_file['commeven']['checkevents'],
+                url=text_from_file['commeven']['evenlink1']
+            )],
+            [InlineKeyboardButton(
+                text_from_file['commeven']['createevents'],
+                url=text_from_file['commeven']['evenlink2']
+            )]
+        ],
+        resize_keyboard=True
+    )
+    return markup
+
+
+# logic part for meeting rooms
+def get_room_name(number):
+    if number == 1:
+        return text_from_file['room']['bibl']
+    elif number == 2:
+        return text_from_file['room']['wind']
+
+
+def create_meeting_room_buttons(room_numbers):
+    buttons = []
+    description = ''
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    for number in room_numbers:
+        button_text = create_name_of_meet_room(
+            text_from_file['room']['meet_room'],
+            get_room_name(number[0])
+        )
+        buttons.append(types.InlineKeyboardButton(button_text, callback_data=str(number[0])))
+        description += text_from_file['room'][number[0]] + '\n'
+        meeting_rooms.append(number[0])
+    markup.add(*buttons)
+    return markup, description, meeting_rooms
 
 
 if __name__ == '__main__':

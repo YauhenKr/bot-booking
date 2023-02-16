@@ -13,8 +13,35 @@ class BookingStateGroup(StatesGroup):
 
 
 class MeetingStateGroup(StatesGroup):
+    room = State()
     date_1 = State()
     date_2 = State()
     time = State()
-    free_room = State()
-    room = State()
+    final_room = State()
+
+
+class DeleteAppointmentState(StatesGroup):
+    booking_code = State()
+    meeting_code = State()
+
+
+class CustomHolidaysState(StatesGroup):
+    holiday = State()
+
+
+class CodesBookingsMeetingsState(StatesGroup):
+    date = State()
+
+
+class BotMailing(StatesGroup):
+    text = State()
+    photo = State()
+    state = State()
+
+
+class CheckCodeState(StatesGroup):
+    code = State()
+
+
+class DeleteUserState(StatesGroup):
+    code = State()

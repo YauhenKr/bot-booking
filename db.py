@@ -50,10 +50,17 @@ class DataBase:
                 (user_id, room, date, qrcode)
             )
 
-    def get_today_bookings_codes(self, date):
+    def get_bookings_codes(self, date):
         with self.connection:
             return self.cursor.execute(
                 '''SELECT qrcode FROM users_bookings WHERE booking_date = (?) ''',
+                (date,)
+            ).fetchall()
+
+    def get_meetings_codes(self, date):
+        with self.connection:
+            return self.cursor.execute(
+                '''SELECT code FROM users_meetings WHERE booking_date = (?) ''',
                 (date,)
             ).fetchall()
 
@@ -129,18 +136,11 @@ class DataBase:
                 '''SELECT user_id FROM users_tickets''',
             ).fetchall()
 
-    # def get_free_meetings(self, date, meeting_time):
-    #     with self.connection:
-    #         return self.cursor.execute(
-    #             '''SELECT room FROM users_meetings WHERE booking_date = (?) AND time = (?)''',
-    #             (date, meeting_time)
-    #         ).fetchall()
-
-    def get_meetings_count(self, date):
+    def get_meetings_count(self, date, number):
         with self.connection:
             return self.cursor.execute(
-                '''SELECT COUNT(meeting_time) FROM users_meetings WHERE booking_date = (?) ''',
-                (date, )
+                '''SELECT COUNT(meeting_time) FROM users_meetings WHERE booking_date = (?) AND room = (?) ''',
+                (date, number)
             ).fetchmany(1)
 
     def get_meetings_room_count(self, time, date):
@@ -211,3 +211,87 @@ class DataBase:
                 WHERE user_id = (?) AND code = (?)''',
                 (user_id, code)
             ).fetchall()
+
+    def delete_booking(self, code):
+        with self.connection:
+            return self.cursor.execute(
+                '''DELETE FROM users_bookings WHERE qrcode = (?)''',
+                (code, )
+            )
+
+    def delete_meeting(self, code):
+        with self.connection:
+            return self.cursor.execute(
+                '''DELETE FROM users_meetings WHERE code = (?)''',
+                (code, )
+            )
+
+    def update_plusone_ticket_this_month(self, user_id):
+        with self.connection:
+            return self.cursor.execute(
+                '''UPDATE users_tickets SET this_month_tickets = this_month_tickets + 1 WHERE user_id = (?)''',
+                (user_id, )
+            )
+
+    def update_plusone_ticket_next_month(self, user_id):
+        with self.connection:
+            return self.cursor.execute(
+                '''UPDATE users_tickets SET next_month_tickets = next_month_tickets + 1 WHERE user_id = (?)''',
+                (user_id, )
+            )
+
+    def add_custom_holidays(self, date):
+        with self.connection:
+            return self.cursor.execute(
+                '''INSERT OR IGNORE INTO custom_holidays (date) VALUES (?)''',
+                (date, )
+            )
+
+    def get_custom_holidays(self):
+        with self.connection:
+            return self.cursor.execute(
+                '''SELECT date FROM custom_holidays'''
+            ).fetchall()
+
+    def set_active(self, user_id, active):
+        with self.connection:
+            return self.cursor.execute(
+                '''UPDATE users SET active = ? WHERE user_id = ?''',
+                (active, user_id, )
+            )
+
+    def get_users_mailing(self):
+        with self.connection:
+            return self.cursor.execute('''SELECT user_id, active FROM users ''').fetchall()
+
+    def select_all_from_bookings(self, code):
+        with self.connection:
+            return self.cursor.execute(
+                '''SELECT * FROM users_bookings WHERE qrcode = (?)''',
+                (code, )
+            ).fetchall()
+
+    def select_all_from_meetings(self, code):
+        with self.connection:
+            return self.cursor.execute(
+                '''SELECT users_meetings.booking_date, users_meetings.meeting_time, meeting_rooms.name 
+                    FROM users_meetings
+                    INNER JOIN meeting_rooms
+                    ON users_meetings.room = meeting_rooms.id
+                    WHERE users_meetings.code = (?)''',
+                (code, )
+            ).fetchall()
+
+    def get_particular_meetings_count(self, date, user_id):
+        with self.connection:
+            return self.cursor.execute(
+                '''SELECT COUNT(meeting_time) FROM users_meetings WHERE booking_date = (?) AND user_id = (?) ''',
+                (date, user_id)
+            ).fetchmany(1)
+
+    def delete_user(self, code):
+        with self.connection:
+            return self.cursor.execute(
+                '''DELETE FROM users WHERE user_id = ?''',
+                (code, )
+            )
